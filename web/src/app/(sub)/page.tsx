@@ -1,38 +1,86 @@
 "use client";
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, PenTool, Image as ImageIcon, Send, Sparkles, BookOpen } from 'lucide-react';
+import React, { useState } from "react";
 
-import { startGame, playTurn } from "../../services/storyService";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  PenTool,
+  Send,
+  Sparkles,
+} from "lucide-react";
+
+import { playTurn, startGame } from "../../services/storyService";
 import { PageData } from "../../shared/types/types";
 
 // --- UI Komponenten (Flowbite-Simulation) ---
 
-const Button = ({ children, onClick, disabled, className = "", color = "blue" }) => {
-  const baseStyle = "group flex items-center justify-center p-0.5 text-center font-medium relative focus:z-10 focus:outline-none transition-all duration-200";
+/**
+ * Props für die Button-Komponente.
+ */
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  color?: "blue" | "gray" | "dark";
+}
+
+/**
+ * Ein flexibler Button mit verschiedenen Stil-Varianten.
+ *
+ * @param props - Die Button-Eigenschaften.
+ */
+const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  disabled,
+  className = "",
+  color = "blue",
+}) => {
+  const baseStyle =
+    "group flex items-center justify-center p-0.5 text-center font-medium relative focus:z-10 focus:outline-none transition-all duration-200";
   const colorStyles = {
     blue: "text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 rounded-lg",
     gray: "text-gray-900 bg-white border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-200 rounded-lg",
-    dark: "text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 rounded-lg"
+    dark: "text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-gray-300 rounded-lg",
   };
 
   return (
-    <button 
-      onClick={onClick} 
-      disabled={disabled} 
-      className={`${baseStyle} ${colorStyles[color]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseStyle} ${colorStyles[color]} ${className} ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
-      <span className="flex items-center gap-2 px-5 py-2.5">
-        {children}
-      </span>
+      <span className="flex items-center gap-2 px-5 py-2.5">{children}</span>
     </button>
   );
 };
 
-const TextInput = ({ placeholder, value, onChange, disabled }) => (
+/**
+ * Props für das TextInput-Feld.
+ */
+interface TextInputProps {
+  placeholder?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+}
+
+/**
+ * Ein einfaches Texteingabefeld.
+ */
+const TextInput: React.FC<TextInputProps> = ({
+  placeholder,
+  value,
+  onChange,
+  disabled,
+}) => (
   <input
     type="text"
-    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+    className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
     placeholder={placeholder}
     value={value}
     onChange={onChange}
@@ -40,10 +88,28 @@ const TextInput = ({ placeholder, value, onChange, disabled }) => (
   />
 );
 
-const TextArea = ({ placeholder, value, onChange, rows = 4 }) => (
+/**
+ * Props für das TextArea-Feld.
+ */
+interface TextAreaProps {
+  placeholder?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  rows?: number;
+}
+
+/**
+ * Ein mehrzeiliges Texteingabefeld.
+ */
+const TextArea: React.FC<TextAreaProps> = ({
+  placeholder,
+  value,
+  onChange,
+  rows = 4,
+}) => (
   <textarea
     rows={rows}
-    className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+    className="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
     placeholder={placeholder}
     value={value}
     onChange={onChange}
@@ -52,33 +118,89 @@ const TextArea = ({ placeholder, value, onChange, rows = 4 }) => (
 
 // --- Hauptanwendung ---
 
+/**
+ * Die Hauptseite der Anwendung (Sub-Route).
+ * Ermöglicht dem Benutzer, eine neue Geschichte zu starten oder eine bestehende fortzusetzen.
+ * Verwaltet den Status der Geschichte, die Seiten und die Interaktion mit dem Backend.
+ */
 export default function WelcomePage() {
   // --- State ---
-  const [mode, setMode] = useState<'setup' | 'reading'>('setup');
-  const [prompt, setPrompt] = useState('');
+
+  /** Der aktuelle Modus der Anzeige: 'setup' für Startbildschirm, 'reading' für das Buch. */
+  const [mode, setMode] = useState<"setup" | "reading">("setup");
+
+  /** Die aktuelle Eingabe des Benutzers (Start-Prompt oder Fortsetzung). */
+  const [prompt, setPrompt] = useState("");
+
+  /** Zeigt an, ob gerade eine Anfrage an das Backend läuft. */
   const [isGenerating, setIsGenerating] = useState(false);
+
+  /** Der Index der aktuell angezeigten Seite (0-basiert). */
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  /** Die Sitzungs-ID der aktuellen Geschichte, erhalten vom Backend. */
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  /** Fehlermeldungen für die Anzeige. */
   const [error, setError] = useState<string | null>(null);
-  
+
   // Story Daten
-  const [storyTitle, setStoryTitle] = useState('');
+  /** Der Titel der Geschichte (wird aus dem ersten Prompt generiert). */
+  const [storyTitle, setStoryTitle] = useState("");
+
+  /** Die Liste der bisher generierten Seiten der Geschichte. */
   const [pages, setPages] = useState<PageData[]>([]);
 
   // --- Daten aus echtem Backend ---
-  const mapResponseToPage = (lastNarrative: string, imageUrl: string | null, turn: number): PageData => ({
-    text: lastNarrative ?? '',
+
+  /**
+   * Hilfsfunktion zum Konvertieren von Backend-Antwortdaten in ein PageData-Objekt.
+   *
+   * @param lastNarrative - Der Text der Geschichte.
+   * @param imageUrl - Die URL des generierten Bildes (oder null).
+   * @param turn - Die Nummer der Runde/Seite.
+   */
+  const mapResponseToPage = (
+    lastNarrative: string,
+    imageUrl: string | null,
+    turn: number
+  ): PageData => ({
+    text: lastNarrative ?? "",
     imageUrl: imageUrl ?? null,
     turn: turn ?? pages.length + 1,
   });
 
-  const buildInitialPages = (response: Awaited<ReturnType<typeof startGame>>): PageData[] => {
+  /**
+   * Erstellt die initialen Seiten basierend auf der Start-Antwort des Backends.
+   * Behandelt den Fall, dass bereits eine History existiert oder eine frische Geschichte gestartet wird.
+   *
+   * @param response - Die Antwort von startGame.
+   */
+  const buildInitialPages = (
+    response: Awaited<ReturnType<typeof startGame>>
+  ): PageData[] => {
     if (Array.isArray(response.history) && response.history.length > 0) {
-      return response.history.map((text, index) => mapResponseToPage(text, index === response.history.length - 1 ? response.image_url : null, index + 1));
+      return response.history.map((text, index) =>
+        mapResponseToPage(
+          text,
+          index === response.history.length - 1 ? response.image_url : null,
+          index + 1
+        )
+      );
     }
-    return [mapResponseToPage(response.last_narrative, response.image_url, response.turn_count ?? 1)];
+    return [
+      mapResponseToPage(
+        response.last_narrative,
+        response.image_url,
+        response.turn_count ?? 1
+      ),
+    ];
   };
 
+  /**
+   * Startet eine neue Geschichte basierend auf dem 'prompt'.
+   * Ruft 'startGame' auf und initialisiert den State für den Lesemodus.
+   */
   const handleStart = async () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
@@ -89,18 +211,26 @@ export default function WelcomePage() {
       const initialPages = buildInitialPages(response);
 
       setPages(initialPages);
-      setStoryTitle(prompt.trim().split(' ').slice(0, 4).join(' ') + '...');
+      setStoryTitle(prompt.trim().split(" ").slice(0, 4).join(" ") + "...");
       setSessionId(response.session_id ?? null);
-      setMode('reading');
+      setMode("reading");
       setCurrentPageIndex(0);
-      setPrompt('');
+      setPrompt("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler beim Starten der Geschichte.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Unbekannter Fehler beim Starten der Geschichte."
+      );
     } finally {
       setIsGenerating(false);
     }
   };
 
+  /**
+   * Setzt die Geschichte fort, basierend auf der Benutzereingabe.
+   * Sendet die Entscheidung an das Backend ('playTurn') und fügt die neue Seite hinzu.
+   */
   const handleContinue = async () => {
     if (!prompt.trim() || !sessionId) return;
     setIsGenerating(true);
@@ -108,75 +238,104 @@ export default function WelcomePage() {
 
     try {
       const response = await playTurn(sessionId, prompt.trim());
-      const nextPage = mapResponseToPage(response.last_narrative, response.image_url, response.turn_count ?? pages.length + 1);
+      const nextPage = mapResponseToPage(
+        response.last_narrative,
+        response.image_url,
+        response.turn_count ?? pages.length + 1
+      );
 
-      setPages(prev => [...prev, nextPage]);
-      setCurrentPageIndex(prev => prev + 1);
-      setPrompt('');
+      setPages((prev) => [...prev, nextPage]);
+      setCurrentPageIndex((prev) => prev + 1);
+      setPrompt("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unbekannter Fehler beim Fortsetzen der Geschichte.');
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Unbekannter Fehler beim Fortsetzen der Geschichte."
+      );
     } finally {
       setIsGenerating(false);
     }
   };
 
+  /** Blättert zur nächsten Seite, falls vorhanden. */
   const nextPage = () => {
-    if (currentPageIndex < pages.length - 1) setCurrentPageIndex(p => p + 1);
+    if (currentPageIndex < pages.length - 1) setCurrentPageIndex((p) => p + 1);
   };
 
+  /** Blättert zur vorherigen Seite, falls möglich. */
   const prevPage = () => {
-    if (currentPageIndex > 0) setCurrentPageIndex(p => p - 1);
+    if (currentPageIndex > 0) setCurrentPageIndex((p) => p - 1);
   };
 
   const currentPage = pages[currentPageIndex];
 
   // --- Render ---
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 font-sans text-slate-800">
-      
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-4 font-sans text-slate-800">
       {/* Navigation Header */}
-      <nav className="w-full max-w-6xl mb-6 flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-        <div className="flex items-center gap-2 text-blue-700 font-bold text-xl">
-          <BookOpen className="w-6 h-6" />
+      <nav className="mb-6 flex w-full max-w-6xl items-center justify-between rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-xl font-bold text-blue-700">
+          <BookOpen className="size-6" />
           <span>AI StoryBuilder</span>
         </div>
-        {mode === 'reading' && (
-          <div className="flex gap-2 items-center">
-            <span className="hidden sm:inline-block text-sm text-gray-500 mr-2">
+        {mode === "reading" && (
+          <div className="flex items-center gap-2">
+            <span className="mr-2 hidden text-sm text-gray-500 sm:inline-block">
               {storyTitle}
             </span>
-            <Button color="gray" onClick={() => setMode('setup')}>Neues Buch</Button>
+            <Button
+              color="gray"
+              onClick={() => {
+                setMode("setup");
+              }}
+            >
+              Neues Buch
+            </Button>
           </div>
         )}
       </nav>
 
       {error && (
-        <div className="w-full max-w-6xl mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg">
+        <div className="mb-4 w-full max-w-6xl rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-red-700">
           {error}
         </div>
       )}
 
       {/* Mode: Setup */}
-      {mode === 'setup' && (
-        <div className="max-w-md w-full bg-white rounded-xl shadow-xl overflow-hidden animate-fade-in">
-          <div className="h-32 bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center">
-            <Sparkles className="text-white w-12 h-12 opacity-80" />
+      {mode === "setup" && (
+        <div className="animate-fade-in w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
+          <div className="flex h-32 items-center justify-center bg-gradient-to-r from-blue-600 to-purple-600">
+            <Sparkles className="size-12 text-white opacity-80" />
           </div>
           <div className="p-8">
-            <h2 className="text-2xl font-bold mb-2 text-gray-900">Erschaffe deine Welt</h2>
-            <p className="text-gray-500 mb-6">Beschreibe kurz das Szenario, das Genre oder die Hauptfigur, um deine Geschichte zu beginnen.</p>
-            
+            <h2 className="mb-2 text-2xl font-bold text-gray-900">
+              Erschaffe deine Welt
+            </h2>
+            <p className="mb-6 text-gray-500">
+              Beschreibe kurz das Szenario, das Genre oder die Hauptfigur, um
+              deine Geschichte zu beginnen.
+            </p>
+
             <div className="space-y-4">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-900">Dein Szenario</label>
-                <TextArea 
-                  placeholder="Z.B.: Ein Cyberpunk-Detektiv sucht im Jahr 2099 nach einer verlorenen Androiden-Katze..." 
+                <label className="mb-2 block text-sm font-medium text-gray-900">
+                  Dein Szenario
+                </label>
+                <TextArea
+                  placeholder="Z.B.: Ein Cyberpunk-Detektiv sucht im Jahr 2099 nach einer verlorenen Androiden-Katze..."
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                  }}
                 />
               </div>
-              <Button onClick={handleStart} disabled={isGenerating || !prompt} className="w-full">
-                {isGenerating ? 'Initiiere Geschichte...' : 'Buch öffnen'}
+              <Button
+                onClick={handleStart}
+                disabled={isGenerating || !prompt}
+                className="w-full"
+              >
+                {isGenerating ? "Initiiere Geschichte..." : "Buch öffnen"}
               </Button>
             </div>
           </div>
@@ -184,43 +343,55 @@ export default function WelcomePage() {
       )}
 
       {/* Mode: Reading */}
-      {mode === 'reading' && pages.length > 0 && (
-        <div className="flex flex-col w-full max-w-6xl h-[85vh] gap-4">
-          
+      {mode === "reading" && pages.length > 0 && (
+        <div className="flex h-[85vh] w-full max-w-6xl flex-col gap-4">
           {/* Buch Container */}
-          <div className="flex-1 bg-white rounded-r-2xl rounded-l-md shadow-2xl overflow-hidden flex flex-col md:flex-row border-l-[12px] border-l-blue-900 relative">
+          <div className="relative flex flex-1 flex-col overflow-hidden rounded-l-md rounded-r-2xl border-l-[12px] border-l-blue-900 bg-white shadow-2xl md:flex-row">
             {/* Schatteneffekt für Buchfalz */}
-            <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-black/20 to-transparent pointer-events-none z-10"></div>
-            
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-4 bg-gradient-to-r from-black/20 to-transparent" />
+
             {/* LINKE SEITE: Text */}
-            <div className="w-full md:w-1/2 p-8 md:p-12 bg-[#fdfbf7] text-gray-800 overflow-y-auto relative flex flex-col">
+            <div className="relative flex w-full flex-col overflow-y-auto bg-[#fdfbf7] p-8 text-gray-800 md:w-1/2 md:p-12">
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-6 border-b border-gray-300 pb-2">
-                  <span className="text-xs uppercase tracking-widest text-gray-400 font-semibold">Seite {currentPageIndex + 1}</span>
-                  <PenTool className="w-4 h-4 text-gray-400" />
+                <div className="mb-6 flex items-center justify-between border-b border-gray-300 pb-2">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                    Seite {currentPageIndex + 1}
+                  </span>
+                  <PenTool className="size-4 text-gray-400" />
                 </div>
-                
+
                 {/* Story Text */}
-                <div className="prose prose-lg font-serif leading-relaxed text-justify whitespace-pre-wrap animate-fade-in">
+                <div className="prose prose-lg animate-fade-in whitespace-pre-wrap text-justify font-serif leading-relaxed">
                   {currentPage.text}
                 </div>
               </div>
 
               {/* Interaktion (Nur letzte Seite) */}
               {currentPageIndex === pages.length - 1 && (
-                <div className="mt-8 pt-6 border-t border-gray-200 bg-[#fdfbf7]">
-                  <label className="block mb-2 text-sm font-medium text-gray-500">Wie geht die Geschichte weiter?</label>
+                <div className="mt-8 border-t border-gray-200 bg-[#fdfbf7] pt-6">
+                  <label className="mb-2 block text-sm font-medium text-gray-500">
+                    Wie geht die Geschichte weiter?
+                  </label>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <TextInput 
-                        placeholder="Der Held entscheidet sich für..." 
+                      <TextInput
+                        placeholder="Der Held entscheidet sich für..."
                         value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
+                        onChange={(e) => {
+                          setPrompt(e.target.value);
+                        }}
                         disabled={isGenerating}
                       />
                     </div>
-                    <Button onClick={handleContinue} disabled={isGenerating || !prompt}>
-                      {isGenerating ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div> : <Send className="w-4 h-4" />}
+                    <Button
+                      onClick={handleContinue}
+                      disabled={isGenerating || !prompt}
+                    >
+                      {isGenerating ? (
+                        <div className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <Send className="size-4" />
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -228,54 +399,60 @@ export default function WelcomePage() {
             </div>
 
             {/* RECHTE SEITE: Bild */}
-            <div className="w-full md:w-1/2 bg-gray-100 relative overflow-hidden flex items-center justify-center border-l border-gray-200">
+            <div className="relative flex w-full items-center justify-center overflow-hidden border-l border-gray-200 bg-gray-100 md:w-1/2">
               {/* Lade-Overlay */}
               {isGenerating && currentPageIndex === pages.length - 1 && (
-                <div className="absolute inset-0 bg-black/10 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
-                  <Sparkles className="w-12 h-12 text-blue-600 animate-pulse mb-4" />
-                  <p className="text-blue-900 font-medium bg-white/50 px-4 py-1 rounded-full backdrop-blur-md">Illustriere Szene...</p>
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm">
+                  <Sparkles className="mb-4 size-12 animate-pulse text-blue-600" />
+                  <p className="rounded-full bg-white/50 px-4 py-1 font-medium text-blue-900 backdrop-blur-md">
+                    Illustriere Szene...
+                  </p>
                 </div>
               )}
-              
-              <img 
-                src={currentPage.imageUrl || 'https://placehold.co/600x800?text=Bild+wird+geladen...'} 
-                alt="Story Illustration" 
-                className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+
+              <img
+                src={
+                  currentPage.imageUrl ||
+                  "https://placehold.co/600x800?text=Bild+wird+geladen..."
+                }
+                alt="Story Illustration"
+                className="size-full object-cover transition-transform duration-700 hover:scale-105"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = 'https://placehold.co/600x800?text=Bild+wird+geladen...';
+                  target.src =
+                    "https://placehold.co/600x800?text=Bild+wird+geladen...";
                 }}
               />
-              
-              <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-600 shadow-sm flex items-center gap-1">
-                <ImageIcon className="w-3 h-3" />
+
+              <div className="absolute bottom-4 right-4 flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-gray-600 shadow-sm backdrop-blur">
+                <ImageIcon className="size-3" />
                 <span>AI Generated</span>
               </div>
             </div>
           </div>
 
           {/* Pagination Controls */}
-          <div className="flex justify-between items-center px-4 py-2 bg-white rounded-lg shadow-sm mx-auto w-full max-w-md">
-            <Button 
-              color="gray" 
-              onClick={prevPage} 
+          <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-lg bg-white px-4 py-2 shadow-sm">
+            <Button
+              color="gray"
+              onClick={prevPage}
               disabled={currentPageIndex === 0}
               className="!border-0"
             >
-              <ChevronLeft className="w-5 h-5 mr-1" /> Zurück
+              <ChevronLeft className="mr-1 size-5" /> Zurück
             </Button>
-            
+
             <span className="font-mono text-sm text-gray-500">
               {currentPageIndex + 1} / {pages.length}
             </span>
 
-            <Button 
-              color="gray" 
-              onClick={nextPage} 
+            <Button
+              color="gray"
+              onClick={nextPage}
               disabled={currentPageIndex === pages.length - 1}
               className="!border-0"
             >
-              Weiter <ChevronRight className="w-5 h-5 ml-1" />
+              Weiter <ChevronRight className="ml-1 size-5" />
             </Button>
           </div>
         </div>
