@@ -10,7 +10,7 @@ Diese Liste dokumentiert, welcher Studierende welche Teile des Projekts implemen
 - Azure Deployment
 - Text Generierung Teil
 
-## Anna-Sophie
+## Anna-Sophia
 
 - Nutzer Evaluation
 - Integration Langfuse und Monitoring
