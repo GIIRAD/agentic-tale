@@ -20,7 +20,7 @@ CORS ist aktuell auf "*" konfiguriert (alle Origins). In der Produktion sollte d
 auf die spezifische Domain des Frontends eingeschränkt werden.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import story
 
@@ -37,11 +37,17 @@ app = FastAPI(
 # Ermöglicht Requests von Frontend-Anwendungen (z.B. Next.js auf localhost:3000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: In Production auf ["https://yourdomain.com"] beschränken
+    allow_origins=["*", "https://ffd0313641ab.ngrok-free.app"],  # TODO: In Production auf ["https://yourdomain.com"] beschränken
     allow_credentials=True,  # Cookies & Authentifizierung erlauben
     allow_methods=["*"],  # GET, POST, etc.
     allow_headers=["*"],  # Alle Header erlauben
 )
+
+@app.middleware("http")
+async def add_private_network_access_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 # --- ROUTER REGISTRIERUNG ---
 

@@ -172,6 +172,15 @@ class GameSession:
             IndexError: Wenn keine aktiven Agenten existieren.
         """
         actives = [a for a in self.agents if a.is_active]
+        
+        if not actives:
+            # Fallback: Falls keine Agenten als aktiv markiert sind (z.B. falsche Rollen),
+            # nutze alle verfügbaren Agenten, um Crash zu vermeiden.
+            actives = self.agents
+            
+        if not actives:
+             raise IndexError("No agents available in game session.")
+
         actor = actives[self.turn_count % len(actives)]
         return actor
 
